@@ -1,0 +1,11 @@
+# === Resources to keep ===
+!*.ico
+!*.bmp
+!*.rc
+!res/
+
+# === Build artifacts ===
+*.exe
+*.o
+*.obj
+*.res
