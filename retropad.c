@@ -12,6 +12,7 @@
 // Global Application State
 AppState g_app = {0};
 
+HWND g_hTab = NULL;
 // Forward Declarations
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static BOOL RegisterMainWindowClass(HINSTANCE hInstance);
@@ -25,7 +26,7 @@ BOOL InitApplication(HINSTANCE hInstance, int nCmdShow) {
     
     INITCOMMONCONTROLSEX icex = {0};
     icex.dwSize = sizeof(icex);
-    icex.dwICC = ICC_BAR_CLASSES;
+    icex.dwICC = ICC_BAR_CLASSES|ICC_TAB_CLASSES;
     InitCommonControlsEx(&icex);
 
     g_app.hInst = hInstance;
@@ -188,22 +189,48 @@ static void OnCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Main Window Procedure
+// -----------------------------------------------------------------------------
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    // Handle custom Find/Replace message
     if (msg == g_app.findMsgId && msg != 0) {
         HandleFindReplace(lParam);
         return 0;
     }
 
     switch (msg) {
-    case WM_CREATE: {
-        // --- CRITICAL FIX START ---
-        // We must tell the app who the main window is NOW, 
-        // otherwise the Edit control tries to attach to a NULL parent.
-        g_app.hwndMain = hwnd; 
-        // --- CRITICAL FIX END ---
 
+    // -------------------------------------------------------------------------
+    // WM_CREATE – Initialize window controls and state
+    // -------------------------------------------------------------------------
+    case WM_CREATE: {
+        g_app.hwndMain = hwnd; 
         EnsureDefaultFont();
         g_app.findMsgId = RegisterWindowMessageW(FINDMSGSTRINGW);
+
+        // === Create Tab Control ===
+        RECT rcClient;
+        GetClientRect(hwnd, &rcClient);
+
+        g_hTab = CreateWindowExW(
+            0, WC_TABCONTROL, NULL,
+            WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
+            0, 0,
+            rcClient.right - rcClient.left,
+            rcClient.bottom - rcClient.top - 20, // leave space for status bar
+            hwnd, (HMENU)IDC_MAIN_TAB, g_app.hInst, NULL
+        );
+
+        if (g_hTab) {
+            TCITEM tie = {0};
+            tie.mask = TCIF_TEXT;
+            tie.pszText = L"Untitled 1";
+            TabCtrl_InsertItem(g_hTab, 0, &tie);
+            TabCtrl_SetCurSel(g_hTab, 0);
+        }
+
+        // === Initialize Edit + Status Bar ===
         RecreateEditControl(); 
         EnsureStatusBar();
         UpdateStatusBarCaret();
@@ -211,39 +238,80 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         DragAcceptFiles(hwnd, TRUE);
         return 0;
     }
+
+    // -------------------------------------------------------------------------
+    // WM_SIZE – Resize child controls on window resize
+    // -------------------------------------------------------------------------
     case WM_SIZE: {
         if (wParam != SIZE_MINIMIZED) {
-            RECT rc = {0, 0, LOWORD(lParam), HIWORD(lParam)};
-            ResizeClientArea(rc);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+
+            // Resize the tab control
+            if (g_hTab) {
+                SetWindowPos(g_hTab, NULL, 0, 0, rc.right, rc.bottom - 20, SWP_NOZORDER);
+            }
+
+            // Resize the edit control to fit below the tabs
+            if (g_app.hwndEdit) {
+                SetWindowPos(g_app.hwndEdit, NULL, 4, 25, rc.right - 8, rc.bottom - 50, SWP_NOZORDER);
+            }
+
             UpdateStatusBarCaret();
         }
         return 0;
     }
+
+    // -------------------------------------------------------------------------
+    // WM_SETFOCUS – Forward focus to the edit control
+    // -------------------------------------------------------------------------
     case WM_SETFOCUS:
         if (g_app.hwndEdit) SetFocus(g_app.hwndEdit);
         return 0;
+
+    // -------------------------------------------------------------------------
+    // WM_COMMAND – Handle menu and accelerator actions
+    // -------------------------------------------------------------------------
     case WM_COMMAND:
         OnCommand(hwnd, wParam, lParam);
         UpdateStatusBarCaret();
         return 0;
+
+    // -------------------------------------------------------------------------
+    // WM_INITMENUPOPUP – Update menu states dynamically
+    // -------------------------------------------------------------------------
     case WM_INITMENUPOPUP:
         UpdateMenuStates((HMENU)wParam);
         return 0;
+
+    // -------------------------------------------------------------------------
+    // WM_DROPFILES – Handle drag & drop file open
+    // -------------------------------------------------------------------------
     case WM_DROPFILES: {
         HDROP hDrop = (HDROP)wParam;
         WCHAR path[MAX_PATH];
         if (DragQueryFileW(hDrop, 0, path, MAX_PATH)) {
-            if (PromptSaveIfDirty()) LoadDocument(path);
+            if (PromptSaveIfDirty()) {
+                LoadDocument(path);
+            }
         }
         DragFinish(hDrop);
         return 0;
     }
+
+    // -------------------------------------------------------------------------
+    // WM_QUERYENDSESSION / WM_CLOSE – Handle close & unsaved prompt
+    // -------------------------------------------------------------------------
     case WM_QUERYENDSESSION:
-        if (!PromptSaveIfDirty()) return FALSE;
-        return TRUE;
+        return PromptSaveIfDirty();
+
     case WM_CLOSE:
         if (PromptSaveIfDirty()) DestroyWindow(hwnd);
         return 0;
+
+    // -------------------------------------------------------------------------
+    // WM_DESTROY – Clean up resources and quit
+    // -------------------------------------------------------------------------
     case WM_DESTROY:
         if (g_app.hFont && g_app.hFont != GetStockObject(DEFAULT_GUI_FONT)) {
             DeleteObject(g_app.hFont);
@@ -251,5 +319,9 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         PostQuitMessage(0);
         return 0;
     }
+
+    // -------------------------------------------------------------------------
+    // Default handling
+    // -------------------------------------------------------------------------
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }

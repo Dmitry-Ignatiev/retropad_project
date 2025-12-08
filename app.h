@@ -37,7 +37,7 @@ typedef struct AppState {
 } AppState;
 
 extern AppState g_app;
-
+extern HWND g_hTab;
 BOOL InitApplication(HINSTANCE hInstance, int nCmdShow);
 void UpdateWindowTitle(void);
 void MarkDocumentDirty(BOOL dirty);
@@ -65,4 +65,5 @@ void ShowFontDialog(HWND owner);
 void ShowAboutDialog(HWND owner);
 void ShowPageSetupDialog(HWND owner);
 void PrintDocument(HWND owner);
-
+void UpdateCurrentTabTitle(const wchar_t *filePath);
+HWND CreateMainTabControl(HWND hwndParent, HINSTANCE hInst);

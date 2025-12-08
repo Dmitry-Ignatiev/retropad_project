@@ -1,8 +1,11 @@
+#pragma comment(lib, "comctl32.lib")
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <commctrl.h>
 #include "app.h"
 
+
+static int g_untitledCounter = 1;
 // -----------------------------------------------------------------------------
 // Forward Declarations
 // -----------------------------------------------------------------------------
@@ -41,11 +44,66 @@ void UpdateMenuStates(HMENU hMenu) {
     // In Classic Notepad, Status Bar is disabled if Word Wrap is ON
     EnableMenuItem(hMenu, IDM_VIEW_STATUSBAR, g_app.wordWrap ? MF_GRAYED : MF_ENABLED);
 }
+HWND CreateMainTabControl(HWND hwndParent, HINSTANCE hInst) {
+    RECT rcClient;
+    GetClientRect(hwndParent, &rcClient);
+
+    HWND hTab = CreateWindowExW(
+        0, WC_TABCONTROL, NULL,
+        WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
+        0, 0,
+        rcClient.right - rcClient.left,
+        rcClient.bottom - rcClient.top - 20,
+        hwndParent, (HMENU)IDC_MAIN_TAB, hInst, NULL
+    );
+
+    if (hTab) {
+        TCITEM tie = {0};
+        tie.mask = TCIF_TEXT;
+        tie.pszText = L"Untitled 1";
+        TabCtrl_InsertItem(hTab, 0, &tie);
+        TabCtrl_SetCurSel(hTab, 0);
+    }
+
+    return hTab;
+}
 
 // -----------------------------------------------------------------------------
 // UpdateStatusBarCaret
 // Updates the "Ln X, Col Y" text in the status bar
 // -----------------------------------------------------------------------------
+void UpdateCurrentTabTitle(const wchar_t *filePath) {
+    if (!g_hTab) return;
+
+    int iSel = TabCtrl_GetCurSel(g_hTab);
+    if (iSel < 0) return;
+
+    wchar_t fileName[MAX_PATH];
+    const wchar_t *pSlash = wcsrchr(filePath, L'\\');
+    const wchar_t *pSlash2 = wcsrchr(filePath, L'/');
+
+    if (pSlash || pSlash2) {
+        const wchar_t *p = (pSlash && pSlash > pSlash2) ? pSlash + 1 : pSlash2 + 1;
+        wcsncpy(fileName, p, MAX_PATH);
+    } else {
+        wcsncpy(fileName, filePath, MAX_PATH);
+    }
+
+    fileName[MAX_PATH - 1] = L'\0';
+
+    TCITEM tie = {0};
+    tie.mask = TCIF_TEXT;
+    tie.pszText = fileName;
+    TabCtrl_SetItem(g_hTab, iSel, &tie);
+    InvalidateRect(g_hTab, NULL, TRUE);
+    UpdateWindow(g_hTab);
+}
+void SetCurrentFilePath(LPCWSTR path) {
+    if (!path) return;
+    wcsncpy(g_app.filePath, path, MAX_PATH);
+    g_app.filePath[MAX_PATH - 1] = L'\0';
+    UpdateWindowTitle();
+}
 void UpdateStatusBarCaret(void) {
     if (!g_app.showStatus || !g_app.hwndStatus || !g_app.hwndEdit) {
         return;

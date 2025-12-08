@@ -7,7 +7,7 @@ static BOOL ChooseFilePath(HWND owner, LPWSTR buffer, DWORD length, BOOL saveDia
 static BOOL WriteBufferToFile(LPCWSTR path, const BYTE *data, DWORD size);
 static BOOL ReadFileToBuffer(LPCWSTR path, BYTE **data, DWORD *size);
 static BOOL DecodeBufferToWide(const BYTE *data, DWORD size, WCHAR **outText);
-
+static int g_untitledCounter = 1;
 void UpdateWindowTitle(void) {
     WCHAR name[MAX_PATH];
     if (g_app.filePath[0]) {
@@ -23,14 +23,7 @@ void UpdateWindowTitle(void) {
     }
 }
 
-void SetCurrentFilePath(LPCWSTR path) {
-    if (path) {
-        lstrcpynW(g_app.filePath, path, MAX_PATH);
-    } else {
-        g_app.filePath[0] = L'\0';
-    }
-    UpdateWindowTitle();
-}
+
 
 BOOL PromptSaveIfDirty(void) {
     if (!g_app.dirty) {
@@ -57,9 +50,22 @@ void NewDocument(void) {
     g_app.suppressChange = TRUE;
     SetWindowTextW(g_app.hwndEdit, L"");
     g_app.suppressChange = FALSE;
-    SetCurrentFilePath(NULL);
+    
+    g_app.filePath[0] = L'\0';
+    //clear dirty flag and update title
     MarkDocumentDirty(FALSE);
     UpdateStatusBarCaret();
+    UpdateWindowTitle();
+
+    //reset tab title
+     if (g_hTab) {
+        TCITEM tie = {0};
+        tie.mask = TCIF_TEXT;
+        wchar_t title[32];
+        wsprintfW(title, L"Untitled %d", g_untitledCounter++);
+        tie.pszText = title;
+        TabCtrl_SetItem(g_hTab, TabCtrl_GetCurSel(g_hTab), &tie);
+    }
 }
 
 void OpenDocument(void) {
@@ -80,6 +86,8 @@ BOOL SaveDocument(BOOL saveAs) {
             return FALSE;
         }
         SetCurrentFilePath(path);
+        UpdateCurrentTabTitle(path);
+
     }
 
     int len = GetWindowTextLengthW(g_app.hwndEdit);
@@ -109,8 +117,11 @@ BOOL SaveDocument(BOOL saveAs) {
 
     if (ok) {
         MarkDocumentDirty(FALSE);
+        UpdateCurrentTabTitle(g_app.filePath);
     }
     return ok;
+    
+
 }
 
 BOOL LoadDocument(LPCWSTR path) {
@@ -132,12 +143,13 @@ BOOL LoadDocument(LPCWSTR path) {
     SetWindowTextW(g_app.hwndEdit, text);
     SendMessageW(g_app.hwndEdit, EM_SETSEL, 0, 0);
     g_app.suppressChange = FALSE;
-
     LocalFree(text);
 
     SetCurrentFilePath(path);
+    UpdateCurrentTabTitle(path);
     MarkDocumentDirty(FALSE);
     UpdateStatusBarCaret();
+
     return TRUE;
 }
 
