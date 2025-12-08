@@ -1,7 +1,10 @@
+#pragma comment(lib, "comctl32.lib")
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <commctrl.h>
 #include "app.h"
+
+
 
 // -----------------------------------------------------------------------------
 // Forward Declarations

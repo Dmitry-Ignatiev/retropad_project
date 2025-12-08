@@ -12,6 +12,7 @@
 // Global Application State
 AppState g_app = {0};
 
+HWND g_hTab = NULL;
 // Forward Declarations
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static BOOL RegisterMainWindowClass(HINSTANCE hInstance);
@@ -25,7 +26,7 @@ BOOL InitApplication(HINSTANCE hInstance, int nCmdShow) {
     
     INITCOMMONCONTROLSEX icex = {0};
     icex.dwSize = sizeof(icex);
-    icex.dwICC = ICC_BAR_CLASSES;
+    icex.dwICC = ICC_BAR_CLASSES|ICC_TAB_CLASSES;
     InitCommonControlsEx(&icex);
 
     g_app.hInst = hInstance;
@@ -204,6 +205,25 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 
         EnsureDefaultFont();
         g_app.findMsgId = RegisterWindowMessageW(FINDMSGSTRINGW);
+        // === Create Tab Control ===
+RECT rcClient;
+GetClientRect(hwnd, &rcClient);
+
+g_hTab = CreateWindowExW(
+    0, WC_TABCONTROL, NULL,
+    WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
+    0, 0,
+    rcClient.right - rcClient.left,
+    rcClient.bottom - rcClient.top - 20, // leave space for status bar
+    hwnd, (HMENU)1001, g_app.hInst, NULL
+);
+
+if (g_hTab) {
+    TCITEM tie = {0};
+    tie.mask = TCIF_TEXT;
+    tie.pszText = L"Untitled 1";
+    TabCtrl_InsertItem(g_hTab, 0, &tie);
+}
         RecreateEditControl(); 
         EnsureStatusBar();
         UpdateStatusBarCaret();

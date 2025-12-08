@@ -8,6 +8,7 @@
 #define IDC_MAIN_EDIT 1001
 
 #define IDC_STATUSBAR           1002
+#define IDC_MAIN_TAB    1003
 #define IDC_GOTO_EDIT           2001
 
 #define IDM_FILE_NEW            40001
