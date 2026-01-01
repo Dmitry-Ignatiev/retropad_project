@@ -38,6 +38,7 @@ typedef struct AppState {
 
 extern AppState g_app;
 extern HWND g_hTab;
+void LayoutChildren(HWND hwnd);
 BOOL InitApplication(HINSTANCE hInstance, int nCmdShow);
 void UpdateWindowTitle(void);
 void MarkDocumentDirty(BOOL dirty);

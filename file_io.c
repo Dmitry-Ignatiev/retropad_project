@@ -56,6 +56,7 @@ void NewDocument(void) {
     MarkDocumentDirty(FALSE);
     UpdateStatusBarCaret();
     UpdateWindowTitle();
+    LayoutChildren(g_app.hwndMain);
 
     //reset tab title
      if (g_hTab) {
@@ -118,6 +119,7 @@ BOOL SaveDocument(BOOL saveAs) {
     if (ok) {
         MarkDocumentDirty(FALSE);
         UpdateCurrentTabTitle(g_app.filePath);
+        LayoutChildren(g_app.hwndMain);
     }
     return ok;
     
@@ -149,7 +151,7 @@ BOOL LoadDocument(LPCWSTR path) {
     UpdateCurrentTabTitle(path);
     MarkDocumentDirty(FALSE);
     UpdateStatusBarCaret();
-
+    LayoutChildren(g_app.hwndMain);
     return TRUE;
 }
 

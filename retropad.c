@@ -192,44 +192,57 @@ static void OnCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
     }
 }
 //helper function to resize window and layout controls
-static void LayoutChildren(HWND hwnd)
+ void LayoutChildren(HWND hwnd)
 {
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-
-    int y = 0;
-
-    // Tabs
-    if (g_hTab) {
-        RECT tr;
-        GetWindowRect(g_hTab, &tr);
-        int tabHeight = tr.bottom - tr.top;
-
-        SetWindowPos(g_hTab, NULL,
-            0, 0,
-            rc.right, tabHeight,
-            SWP_NOZORDER);
-
-        y += tabHeight;
-    }
+    RECT rcClient;
+    GetClientRect(hwnd, &rcClient);
 
     // Status bar
     int statusHeight = 0;
     if (g_app.hwndStatus) {
+        SendMessageW(g_app.hwndStatus, WM_SIZE, 0, 0);
+
         RECT sr;
-        GetWindowRect(g_app.hwndStatus, &sr);
-        statusHeight = sr.bottom - sr.top;
+        GetClientRect(g_app.hwndStatus, &sr);
+        statusHeight = sr.bottom;
     }
+
+    int y = 0;
+
+    // Tabs
+    int tabHeight = 0;
+    if (g_hTab) {
+        RECT tr = rcClient;
+        TabCtrl_AdjustRect(g_hTab, FALSE, &tr);
+        tabHeight = tr.top;
+
+        SetWindowPos(
+            g_hTab,
+            NULL,
+            0, 0,
+            rcClient.right,
+            tabHeight,
+            SWP_NOZORDER | SWP_NOACTIVATE
+        );
+    }
+
+    y = tabHeight;
 
     // Edit control
     if (g_app.hwndEdit) {
-        SetWindowPos(g_app.hwndEdit, NULL,
+        SetWindowPos(
+            g_app.hwndEdit,
+            NULL,
             0, y,
-            rc.right,
-            rc.bottom - y - statusHeight,
-            SWP_NOZORDER);
+            rcClient.right,
+            rcClient.bottom - y - statusHeight,
+            SWP_NOZORDER | SWP_NOACTIVATE
+        );
     }
+
+    UpdateStatusBarCaret();
 }
+
 
 // -----------------------------------------------------------------------------
 // Main Window Procedure
@@ -295,66 +308,8 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         return 0;
     }
 
-case WM_SIZE:
-{
-    if (wParam == SIZE_MINIMIZED)
-        return 0;
 
-    RECT rcClient;
-    GetClientRect(hwnd, &rcClient);
-
-    // Let status bar size itself
-    int statusHeight = 0;
-    if (g_app.hwndStatus) {
-        SendMessageW(g_app.hwndStatus, WM_SIZE, 0, 0);
-
-        RECT sr;
-        GetClientRect(g_app.hwndStatus, &sr);
-        statusHeight = sr.bottom;
-    }
-
-    int y = 0;
-
-   // Tabs
-int tabHeight = 0;
-if (g_hTab) {
-    RECT tr;
-
-    // Start with full client area
-    tr = rcClient;
-
-    // Ask the tab control how much space it needs for tabs
-    TabCtrl_AdjustRect(g_hTab, FALSE, &tr);
-
-    // The top offset is the real tab height
-    tabHeight = tr.top;
-
-    SetWindowPos(
-        g_hTab,
-        NULL,
-        0, 0,
-        rcClient.right,
-        tabHeight,
-        SWP_NOZORDER | SWP_NOACTIVATE
-    );
-}
-    y = tabHeight;
-
-    // Edit control
-    if (g_app.hwndEdit) {
-        SetWindowPos(
-            g_app.hwndEdit,
-            NULL,
-            0, y,
-            rcClient.right,
-            rcClient.bottom - y - statusHeight,
-            SWP_NOZORDER | SWP_NOACTIVATE
-        );
-    }
-
-    UpdateStatusBarCaret();
-    return 0;
-}
+   
 
 
     case WM_SETFOCUS:
@@ -383,7 +338,10 @@ if (g_hTab) {
         DragFinish(hDrop);
         return 0;
     }
-
+    case WM_SIZE:
+        if (wParam != SIZE_MINIMIZED)
+            LayoutChildren(hwnd);
+        return 0;
     case WM_QUERYENDSESSION:
         return PromptSaveIfDirty();
 
