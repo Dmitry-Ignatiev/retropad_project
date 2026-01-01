@@ -8,7 +8,7 @@
 #define IDC_MAIN_EDIT 1001
 
 #define IDC_STATUSBAR           1002
-#define IDC_MAIN_TAB    1003
+#define IDC_MAIN_TAB    1003 //tab control
 #define IDC_GOTO_EDIT           2001
 
 #define IDM_FILE_NEW            40001
@@ -36,3 +36,4 @@
 #define IDM_VIEW_STATUSBAR      40301
 
 #define IDM_HELP_ABOUT          40401
+#define IDM_EDIT_TIMESTAMP  40050

@@ -1,6 +1,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <commctrl.h>
+#include <tchar.h>
+#include <strsafe.h>
+
+#include "resource.h"
 #include "app.h"
 
 
@@ -21,8 +24,17 @@ void InsertTimeDate(void) {
     GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, timeBuf, ARRAYSIZE(timeBuf));
 
     WCHAR stamp[128];
-    wsprintfW(stamp, L"%s %s", timeBuf, dateBuf);
+   StringCchPrintfW(
+    stamp,
+    ARRAYSIZE(stamp),
+    L"%s %s",
+    timeBuf,
+    dateBuf
+);
+
     SendMessageW(g_app.hwndEdit, EM_REPLACESEL, TRUE, (LPARAM)stamp);
+    InvalidateRect(g_app.hwndEdit, NULL, TRUE);
+    UpdateWindow(g_app.hwndEdit);
 }
 
 void ShowFindDialog(BOOL replaceMode) {

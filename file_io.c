@@ -178,7 +178,15 @@ static BOOL ChooseFilePath(HWND owner, LPWSTR buffer, DWORD length, BOOL saveDia
 }
 
 static BOOL WriteBufferToFile(LPCWSTR path, const BYTE *data, DWORD size) {
-    HANDLE hFile = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+   HANDLE hFile = CreateFileW(
+    path,
+    GENERIC_WRITE,
+    FILE_SHARE_READ | FILE_SHARE_WRITE,
+    NULL,
+    CREATE_ALWAYS,
+    FILE_ATTRIBUTE_NORMAL,
+    NULL
+);
     if (hFile == INVALID_HANDLE_VALUE) {
         MessageBoxW(g_app.hwndMain, L"Unable to write file.", APP_NAME, MB_ICONERROR);
         return FALSE;
