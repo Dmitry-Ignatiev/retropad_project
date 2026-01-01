@@ -4,8 +4,10 @@
 #define _WIN32_IE 0x0500
 
 #include <windows.h>
-#include <commctrl.h>
 #include <tchar.h>
+#include <strsafe.h>
+#include <commctrl.h>
+
 #include "resource.h"
 #include "app.h"
 
@@ -13,6 +15,7 @@
 AppState g_app = {0};
 
 HWND g_hTab = NULL;
+static HBRUSH g_hEditBgBrush = NULL;
 // Forward Declarations
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static BOOL RegisterMainWindowClass(HINSTANCE hInstance);
@@ -188,28 +191,82 @@ static void OnCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
         }
     }
 }
+//helper function to resize window and layout controls
+static void LayoutChildren(HWND hwnd)
+{
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+
+    int y = 0;
+
+    // Tabs
+    if (g_hTab) {
+        RECT tr;
+        GetWindowRect(g_hTab, &tr);
+        int tabHeight = tr.bottom - tr.top;
+
+        SetWindowPos(g_hTab, NULL,
+            0, 0,
+            rc.right, tabHeight,
+            SWP_NOZORDER);
+
+        y += tabHeight;
+    }
+
+    // Status bar
+    int statusHeight = 0;
+    if (g_app.hwndStatus) {
+        RECT sr;
+        GetWindowRect(g_app.hwndStatus, &sr);
+        statusHeight = sr.bottom - sr.top;
+    }
+
+    // Edit control
+    if (g_app.hwndEdit) {
+        SetWindowPos(g_app.hwndEdit, NULL,
+            0, y,
+            rc.right,
+            rc.bottom - y - statusHeight,
+            SWP_NOZORDER);
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Main Window Procedure
 // -----------------------------------------------------------------------------
-static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
     // Handle custom Find/Replace message
     if (msg == g_app.findMsgId && msg != 0) {
         HandleFindReplace(lParam);
         return 0;
     }
 
-    switch (msg) {
+    switch (msg)
+    {
+    case WM_CTLCOLOREDIT:
+    {
+        HDC hdc = (HDC)wParam;
+        HWND hCtrl = (HWND)lParam;
 
-    // -------------------------------------------------------------------------
-    // WM_CREATE – Initialize window controls and state
-    // -------------------------------------------------------------------------
-    case WM_CREATE: {
-        g_app.hwndMain = hwnd; 
+        if (hCtrl == g_app.hwndEdit) {
+            SetBkColor(hdc, RGB(255, 255, 255));
+            SetTextColor(hdc, RGB(0, 0, 0));
+
+            if (!g_hEditBgBrush) {
+                g_hEditBgBrush = CreateSolidBrush(RGB(255, 255, 255));
+            }
+            return (LRESULT)g_hEditBgBrush;
+        }
+        break;
+    }
+
+    case WM_CREATE:
+    {
+        g_app.hwndMain = hwnd;
         EnsureDefaultFont();
         g_app.findMsgId = RegisterWindowMessageW(FINDMSGSTRINGW);
 
-        // === Create Tab Control ===
         RECT rcClient;
         GetClientRect(hwnd, &rcClient);
 
@@ -217,8 +274,8 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             0, WC_TABCONTROL, NULL,
             WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
             0, 0,
-            rcClient.right - rcClient.left,
-            rcClient.bottom - rcClient.top - 20, // leave space for status bar
+            rcClient.right,
+            rcClient.bottom - 20,
             hwnd, (HMENU)IDC_MAIN_TAB, g_app.hInst, NULL
         );
 
@@ -230,8 +287,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             TabCtrl_SetCurSel(g_hTab, 0);
         }
 
-        // === Initialize Edit + Status Bar ===
-        RecreateEditControl(); 
+        RecreateEditControl();
         EnsureStatusBar();
         UpdateStatusBarCaret();
         UpdateWindowTitle();
@@ -239,57 +295,86 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         return 0;
     }
 
-    // -------------------------------------------------------------------------
-    // WM_SIZE – Resize child controls on window resize
-    // -------------------------------------------------------------------------
-    case WM_SIZE: {
-        if (wParam != SIZE_MINIMIZED) {
-            RECT rc;
-            GetClientRect(hwnd, &rc);
-
-            // Resize the tab control
-            if (g_hTab) {
-                SetWindowPos(g_hTab, NULL, 0, 0, rc.right, rc.bottom - 20, SWP_NOZORDER);
-            }
-
-            // Resize the edit control to fit below the tabs
-            if (g_app.hwndEdit) {
-                SetWindowPos(g_app.hwndEdit, NULL, 4, 25, rc.right - 8, rc.bottom - 50, SWP_NOZORDER);
-            }
-
-            UpdateStatusBarCaret();
-        }
+case WM_SIZE:
+{
+    if (wParam == SIZE_MINIMIZED)
         return 0;
+
+    RECT rcClient;
+    GetClientRect(hwnd, &rcClient);
+
+    // Let status bar size itself
+    int statusHeight = 0;
+    if (g_app.hwndStatus) {
+        SendMessageW(g_app.hwndStatus, WM_SIZE, 0, 0);
+
+        RECT sr;
+        GetClientRect(g_app.hwndStatus, &sr);
+        statusHeight = sr.bottom;
     }
 
-    // -------------------------------------------------------------------------
-    // WM_SETFOCUS – Forward focus to the edit control
-    // -------------------------------------------------------------------------
+    int y = 0;
+
+   // Tabs
+int tabHeight = 0;
+if (g_hTab) {
+    RECT tr;
+
+    // Start with full client area
+    tr = rcClient;
+
+    // Ask the tab control how much space it needs for tabs
+    TabCtrl_AdjustRect(g_hTab, FALSE, &tr);
+
+    // The top offset is the real tab height
+    tabHeight = tr.top;
+
+    SetWindowPos(
+        g_hTab,
+        NULL,
+        0, 0,
+        rcClient.right,
+        tabHeight,
+        SWP_NOZORDER | SWP_NOACTIVATE
+    );
+}
+    y = tabHeight;
+
+    // Edit control
+    if (g_app.hwndEdit) {
+        SetWindowPos(
+            g_app.hwndEdit,
+            NULL,
+            0, y,
+            rcClient.right,
+            rcClient.bottom - y - statusHeight,
+            SWP_NOZORDER | SWP_NOACTIVATE
+        );
+    }
+
+    UpdateStatusBarCaret();
+    return 0;
+}
+
+
     case WM_SETFOCUS:
         if (g_app.hwndEdit) SetFocus(g_app.hwndEdit);
         return 0;
 
-    // -------------------------------------------------------------------------
-    // WM_COMMAND – Handle menu and accelerator actions
-    // -------------------------------------------------------------------------
     case WM_COMMAND:
         OnCommand(hwnd, wParam, lParam);
         UpdateStatusBarCaret();
         return 0;
 
-    // -------------------------------------------------------------------------
-    // WM_INITMENUPOPUP – Update menu states dynamically
-    // -------------------------------------------------------------------------
     case WM_INITMENUPOPUP:
         UpdateMenuStates((HMENU)wParam);
         return 0;
 
-    // -------------------------------------------------------------------------
-    // WM_DROPFILES – Handle drag & drop file open
-    // -------------------------------------------------------------------------
-    case WM_DROPFILES: {
+    case WM_DROPFILES:
+    {
         HDROP hDrop = (HDROP)wParam;
         WCHAR path[MAX_PATH];
+
         if (DragQueryFileW(hDrop, 0, path, MAX_PATH)) {
             if (PromptSaveIfDirty()) {
                 LoadDocument(path);
@@ -299,29 +384,30 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
         return 0;
     }
 
-    // -------------------------------------------------------------------------
-    // WM_QUERYENDSESSION / WM_CLOSE – Handle close & unsaved prompt
-    // -------------------------------------------------------------------------
     case WM_QUERYENDSESSION:
         return PromptSaveIfDirty();
 
     case WM_CLOSE:
         if (PromptSaveIfDirty()) DestroyWindow(hwnd);
         return 0;
-
-    // -------------------------------------------------------------------------
-    // WM_DESTROY – Clean up resources and quit
-    // -------------------------------------------------------------------------
+    case WM_ERASEBKGND:
+        return 1;
     case WM_DESTROY:
         if (g_app.hFont && g_app.hFont != GetStockObject(DEFAULT_GUI_FONT)) {
             DeleteObject(g_app.hFont);
+            g_app.hFont = NULL;
         }
+
+        if (g_hEditBgBrush) {
+            DeleteObject(g_hEditBgBrush);
+            g_hEditBgBrush = NULL;
+        }
+
         PostQuitMessage(0);
         return 0;
     }
 
-    // -------------------------------------------------------------------------
-    // Default handling
-    // -------------------------------------------------------------------------
-    return DefWindowProcW(hwnd, msg, wParam, lParam);
+    // ✅ switch ends here
+    
+   return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
