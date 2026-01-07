@@ -235,9 +235,9 @@ void RecreateEditControl(void) {
     DWORD exStyle = WS_EX_CLIENTEDGE;
     
     // Logic: If WordWrap is OFF, we need a Horizontal Scrollbar.
-    if (!g_app.wordWrap) {
-        style |= WS_HSCROLL | ES_AUTOHSCROLL;
-    }
+if (!g_app.wordWrap) {
+    style |= WS_HSCROLL | ES_AUTOHSCROLL;
+}
 
     // Create the new EDIT control
     g_app.hwndEdit = CreateWindowExW(
