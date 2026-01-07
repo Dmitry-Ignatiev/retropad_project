@@ -299,7 +299,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
             TabCtrl_InsertItem(g_hTab, 0, &tie);
             TabCtrl_SetCurSel(g_hTab, 0);
         }
-
+        g_app.wordWrap = TRUE;
         RecreateEditControl();
         EnsureStatusBar();
         UpdateStatusBarCaret();
