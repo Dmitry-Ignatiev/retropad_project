@@ -1,7 +1,7 @@
 # RetroPad Notepad
 
 A lightweight retro-style text editor written in pure C using the Win32 API, inspired by Dave Plummer’s *Dave’s Garage* projects.  
-Developed collaboratively by Codex LLM and adjusted, debugged, and finalized by Dmitry Ignatiev using ChatGPT Model 5.1 and Gemini 3 Pro.
+Developed collaboratively by Codex LLM and adjusted, debugged, and finalized by Dmitry Ignatiev using ChatGPT Model 5.2 .
 
 **Note:**  
 The goal of this project was to test how effectively an LLM could complete a full C/Win32 GUI application inside VS Code.  
